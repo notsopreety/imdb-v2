@@ -269,6 +269,7 @@ app.get('/', (req, res) => {
         message: 'Welcome to IMDb Scraper API',
         endpoints: {
             genres: '/api/genres',
+            genresAtBulk: '/api/genre',
             genre: '/api/genre/:genreName',
             topLists: '/api/top-lists',
             top: '/api/top/:listName'
