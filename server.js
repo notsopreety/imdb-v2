@@ -90,11 +90,6 @@ async function scrapeIMDBGenre(genreId) {
       coverImg: cleanImageUrl($('div.ipc-media--dynamic img.ipc-image').attr('src') || ''),
       description: $('div.ipc-overflowText--pageSection div.ipc-html-content-inner-div').text().trim(),
       type: $('div.ipc-title--category-title div.ipc-title__description').text().trim(),
-      contents: {
-        all: parseInt($('a[data-testid="chip-see-all-titles"] span.ipc-chip__count').text().trim(), 10) || 0,
-        movies: parseInt($('a[data-testid="chip-see-all-movies"] span.ipc-chip__count').text().trim(), 10) || 0,
-        tvShows: parseInt($('a[data-testid="chip-see-all-tv-series"] span.ipc-chip__count').text().trim(), 10) || 0
-      },
       popular_movies: [],
       top_rated_movies: [],
       popular_tv_shows: [],
