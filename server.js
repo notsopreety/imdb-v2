@@ -4,6 +4,7 @@ const cheerio = require('cheerio');
 const NodeCache = require('node-cache');
 const cors = require('cors');
 const { genre, top } = require('./id');
+const { scrapeIMDBSelectedCategories } = require('./genre');
 
 // Initialize express app
 const app = express();
@@ -28,28 +29,41 @@ async function scrapeIMDBGenre(genreId) {
             }
         });
         
-        // Load HTML content into cheerio
+        // Load HTML content into Cheerio
         const $ = cheerio.load(data);
         
-        // Result object to store all scraped data
+        // Initialize result object with all required fields
         const result = {
+            genreTitle: '',
+            coverImg: '',
+            description: '',
+            type: '',
             popular_movies: [],
             top_rated_movies: [],
             popular_tv_shows: [],
             top_rated_tv_shows: []
         };
 
-        // Find all sections
+        // Extract genre information
+        result.genreTitle = $('div.ipc-title--category-title h3.ipc-title__text').text().trim();
+        result.type = $('div.ipc-title--category-title div.ipc-title__description').text().trim();
+        result.description = $('div.ipc-overflowText--pageSection div.ipc-html-content-inner-div').text().trim();
+        
+        // Extract and clean cover image URL
+        const coverImgElement = $('div.ipc-media--dynamic img.ipc-image');
+        let coverImg = coverImgElement.attr('src') || '';
+        if (coverImg) {
+            coverImg = coverImg.replace(/\._V1_.*\.jpg/, '.jpg');
+        }
+        result.coverImg = coverImg;
+
+        // Scrape sections for popular and top-rated titles
         $('section.ipc-page-section').each((index, sectionElement) => {
             const section = $(sectionElement);
-            
-            // Get section title
             const titleText = section.find('h3.ipc-title__text').text().trim();
-            const subtitleText = section.find('div.ipc-title__description').text().trim();
-            
             let categoryKey = '';
-            
-            // Determine which category this section belongs to
+
+            // Map section titles to result object keys
             if (titleText === 'Popular movies') {
                 categoryKey = 'popular_movies';
             } else if (titleText === 'Top rated movies') {
@@ -59,35 +73,23 @@ async function scrapeIMDBGenre(genreId) {
             } else if (titleText === 'Top rated TV shows') {
                 categoryKey = 'top_rated_tv_shows';
             } else {
-                return; // Skip this section if it doesn't match our categories
+                return; // Skip unrecognized sections
             }
-            
-            // Find all poster cards in this section
+
+            // Extract poster cards within the section
             section.find('div.ipc-poster-card').each((i, cardElement) => {
                 const card = $(cardElement);
-                
-                // Get the URL that contains the IMDB ID
                 const titleLink = card.find('a.ipc-poster-card__title').attr('href');
                 const imdbId = titleLink ? titleLink.match(/\/title\/(tt\d+)/)?.[1] : null;
-                
-                // Get the title
                 const title = card.find('span[data-testid="title"]').text().trim();
-                
-                // Get the rating
                 const rating = card.find('.ipc-rating-star--rating').text().trim();
-                
-                // Get the image URL and clean it
                 const imageElement = card.find('.ipc-poster__poster-image img');
                 let image = imageElement.attr('src') || '';
-                
-                // Clean the image URL by removing the size and quality parameters
+
                 if (image) {
-                    // Extract the base part of the image URL before the parameters
-                    const cleanedImage = image.replace(/\._V1_.*\.jpg/, '.jpg');
-                    image = cleanedImage;
+                    image = image.replace(/\._V1_.*\.jpg/, '.jpg');
                 }
-                
-                // Only add if we have an IMDB ID and image
+
                 if (imdbId && image) {
                     result[categoryKey].push({
                         imdbId,
@@ -98,13 +100,14 @@ async function scrapeIMDBGenre(genreId) {
                 }
             });
         });
-        
+
         return result;
     } catch (error) {
-        console.error('Error scraping IMDB genre:', error.message);
+        console.error('Error scraping IMDb genre:', error.message);
         throw error;
     }
 }
+
 
 // Function to scrape top lists
 async function scrapeTopMovies(topUrl) {
@@ -186,6 +189,20 @@ app.get('/api/genres', (req, res) => {
 // Get all available top lists
 app.get('/api/top-lists', (req, res) => {
     res.json(Object.keys(top));
+});
+
+// Get all genre at bulk
+
+app.get('/api/genre', async (req, res) => {
+    try {
+        const genreData = await scrapeIMDBSelectedCategories();
+        
+        res.json({
+            data: genreData
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch genre data', message: error.message });
+    }
 });
 
 // Get movies by genre
